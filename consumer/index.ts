@@ -4,6 +4,7 @@ import * as path from 'path';
 
 const myChart = new HelmChart('cert-manager', {
   chart: 'cert-manager',
+  namespace: 'cert-manager',
   releaseName: 'cert-manager-release',
   repo: {
     name: 'jetstack',

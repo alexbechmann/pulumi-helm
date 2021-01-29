@@ -25,8 +25,18 @@ export class HelmChartProvider implements pulumi.dynamic.ResourceProvider {
     previousOutput: HelmChartOutputs,
     news: HelmChartInputs
   ): Promise<pulumi.dynamic.DiffResult> {
+    let deleteBeforeReplace = false;
+    const replaces: string[] = [];
+
+    if (previousOutput.releaseName !== news.releaseName) {
+      deleteBeforeReplace = true;
+      replaces.push('releaseName');
+    }
+
     return {
       changes: true,
+      replaces,
+      deleteBeforeReplace,
     };
   }
 
@@ -52,12 +62,15 @@ export class HelmChartProvider implements pulumi.dynamic.ResourceProvider {
         inputs.yamlOutputDir,
         `${inputs.releaseName}.yaml`
       );
-      console.log({ outputFilePath });
       shell.mkdir(inputs.yamlOutputDir!);
       shell.exec(
         `helm template ${inputs.releaseName} ${inputs.repo.name}/${inputs.chart} > ${outputFilePath}`
       );
     }
+
+    shell.exec(
+      `helm upgrade ${inputs.releaseName} ${inputs.repo.name}/${inputs.chart} --namespace ${inputs.namespace} --install --create-namespace --wait`
+    );
 
     return {
       revision: '1',
@@ -71,12 +84,15 @@ export class HelmChartProvider implements pulumi.dynamic.ResourceProvider {
       ...o,
     };
     return {
-      id: 'helm-release-revision-number',
+      id: inputs.releaseName,
       outs,
     };
   }
 
   async delete(id: string, props: HelmChartOutputs): Promise<void> {
+    shell.exec(
+      `helm uninstall ${props.releaseName} --namespace ${props.namespace}`
+    );
     console.log(`Delete ${id}`, {});
   }
 }
@@ -84,6 +100,7 @@ export class HelmChartProvider implements pulumi.dynamic.ResourceProvider {
 export interface HelmChartOptions {
   chart: pulumi.Input<string>;
   releaseName: pulumi.Input<string>;
+  namespace: pulumi.Input<string>;
   repo: {
     name: pulumi.Input<string>;
     url: pulumi.Input<string>;
